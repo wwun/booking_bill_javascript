@@ -1,8 +1,9 @@
-import { findAllDishes, saveBooking } from './API.js';
+import { findAllDishes, saveBooking, saveOrderAndPayment } from './API.js';
 import { createIDb, saveBookingIntoIDB, loadBookingFromIDB } from './indexDb.js'
 
 let order = {
     clientName: '',
+    clientEmail: '',
     table: '',
     time: '',
     orders: []
@@ -13,22 +14,27 @@ export function cleanForm(){
 }
 
 export function createBooking(){
-    const name = document.querySelector('#name').value;
-    const email = document.querySelector('#email').value;
-    const phone = document.querySelector('#phone').value;
-    const table = document.querySelector('#table').value;
-    const time = document.querySelector('#time').value;
+    const clientName = document.querySelector('#name').value;
+    const clientEmail = document.querySelector('#email').value;
+    const clientPhone = document.querySelector('#phone').value;
+    const tableReserved = document.querySelector('#table').value;
+    const timeReserved = document.querySelector('#time').value;
 
-    const clientBooking = { name, email, phone, table, time };
+    const clientBooking = { clientName, clientEmail, clientPhone, tableReserved, timeReserved };
 
-    // if(validateFields(clientBooking)){
-    //     showAlert(document.querySelector('.modal-body'), 'Any field could be empty');
-    // }else{
-        //saveBooking({...clientBooking, date : new Date() });
+    if(validateFields(clientBooking)){
         
-        order.clientName = name;
-        order.table = table;
-        order.time = time;
+        showAlert(document.querySelector('.modal-body'), 'Any field could be empty');
+        
+    }else{
+        
+        const clientId = Number(Date.now());
+        saveBooking({id : clientId, ...clientBooking });
+        
+        order.clientName = clientName;
+        order.clientEmail = clientEmail;
+        order.table = tableReserved;
+        order.time = timeReserved;
 
         const modalForm = document.querySelector('#form');
         const modalBootstrap = bootstrap.Modal.getInstance(modalForm);
@@ -37,7 +43,12 @@ export function createBooking(){
         showSections();
 
         loadAllDishes();
-    // }
+
+        showConsumptionSummary();
+
+        createDivTips();
+
+    }
 
     console.log('save clientBooking');
 }
@@ -66,27 +77,31 @@ export function validateFields(obj){
 }
 
 export async function loadLastEntries(form){
-    const bookingInfo = await loadBookingFromIDB();
+    try{
+        const bookingInfo = await loadBookingFromIDB();
 
-    if(bookingInfo){
-        const { name, email, phone, table, time } = bookingInfo;
+        if(bookingInfo){
+            const { name, email, phone, table, time } = bookingInfo;
 
-        document.querySelector('#name').value = name;
-        document.querySelector('#email').value = email;
-        document.querySelector('#phone').value = phone;
-        document.querySelector('#table').value = table;
-        document.querySelector('#time').value = time;
-    }else{
-        console.log('nothing to load');
-        showAlert(form, 'Nothing to load');
+            document.querySelector('#name').value = name;
+            document.querySelector('#email').value = email;
+            document.querySelector('#phone').value = phone;
+            document.querySelector('#table').value = table;
+            document.querySelector('#time').value = time;
+        }else{
+            console.log('nothing to load');
+            showAlert(form, 'Nothing to load');
+        }
+    }catch(error){
+        console.log(`failed to load bookingInfo ${error.message}`);
     }
 }
 
-export function createIDbToSaveEntries(){
-    createIDb();
+export async function createIDbToSaveEntries(){
+    // await createIDb();
 }
 
-export function saveLastEntriesIntoIDb(){
+export async function saveLastEntriesIntoIDb(){
     
     const name = document.querySelector('#name').value;
     const email = document.querySelector('#email').value;
@@ -97,9 +112,7 @@ export function saveLastEntriesIntoIDb(){
     const entriesToSave = { name, email, phone, table, time };
 
     if(!Object.values(entriesToSave).every(inputValue => inputValue === '')){
-        saveBookingIntoIDB(entriesToSave);
-    }else{
-        console.log('todo vacío');
+        await saveBookingIntoIDB(entriesToSave);
     }
 }
 
@@ -152,6 +165,10 @@ export async function loadAllDishes(){
             inputQuantity.onchange = function(){
                 const quantity = parseInt(inputQuantity.value);
                 addDishToOrder({...dish, quantity});   /////////////////////////////////////////////////
+
+                showHideTip();
+
+                calculateTip();
             }
 
             const add = document.createElement('DIV');
@@ -188,11 +205,10 @@ function showConsumptionSummary(){
 
     const consumptionSummary = document.querySelector('#consumption-summary');
 
-    clearComponent(consumptionSummary);
+    const summary = document.querySelector('#summary');
 
-    const summary = document.createElement('DIV');
-    summary.classList.add('col-md-6', 'card', 'py-2', 'px-3', 'shadow');
-
+    clearComponent(summary);    
+    
     const table = document.createElement('P');
     table.textContent = 'Table: ';
     table.classList.add('fw-bold');
@@ -290,6 +306,8 @@ function showConsumptionSummary(){
     summary.appendChild(group);
 
     consumptionSummary.appendChild(summary);
+
+    console.log('showConsumptionSummary');
 }
 
 function calculateSubTotal(quantity, price){
@@ -305,6 +323,150 @@ function deleteOrder(id){
 function clearComponent(component){
     while(component.firstChild){
         component.removeChild(component.firstChild);
+    }
+}
+
+export function createDivTips(){
+    const contenido = document.querySelector('#consumption-summary');
+
+    const tipDiv = document.querySelector('#tipDiv');
+    
+    const divTipDiv = document.createElement('H3');
+    divTipDiv.classList.add('card', 'py-2', 'px-3', 'shadow');
+
+    const heading = document.createElement('H3');
+    heading.classList.add('my-4', 'text-center');
+    heading.textContent = 'tip';
+
+    //radio button
+    const radio10 = document.createElement('INPUT');
+    radio10.type = 'radio';
+    radio10.name = 'tip';
+    radio10.value = '0.10';
+    radio10.classList.add('form-check-input');
+    radio10.onclick = calculateTip;
+
+    const radio10Label = document.createElement('LABEL');
+    radio10Label.textContent = '10%';
+    radio10Label.classList.add('form-check-label');
+
+    const radio10Div = document.createElement('DIV');
+    radio10Div.classList.add('form-check', 'fs-5');
+
+    radio10Div.appendChild(radio10);
+    radio10Div.appendChild(radio10Label);
+
+    //radio button
+    const radio25 = document.createElement('INPUT');
+    radio25.type = 'radio';
+    radio25.name = 'tip';   //este name debe ser el mismo que el de 25 para que se seleccione uno u otro
+    radio25.value = '0.25';
+    radio25.classList.add('form-check-input');
+    radio25.onclick = calculateTip;
+
+    const radio25Label = document.createElement('LABEL');
+    radio25Label.textContent = '25%';
+    radio25Label.classList.add('form-check-label');
+
+    const radio25Div = document.createElement('DIV');
+    radio25Div.classList.add('form-check', 'fs-5');
+
+    radio25Div.appendChild(radio25);
+    radio25Div.appendChild(radio25Label);
+
+    //radio button
+    const radio50 = document.createElement('INPUT');
+    radio50.type = 'radio';
+    radio50.name = 'tip';   //este name debe ser el mismo que el de 25 para que se seleccione uno u otro
+    radio50.value = '0.50';
+    radio50.classList.add('form-check-input');
+    radio50.onclick = calculateTip;
+
+    const radio50Label = document.createElement('LABEL');
+    radio50Label.textContent = '50%';
+    radio50Label.classList.add('form-check-label');
+
+    const radio50Div = document.createElement('DIV');
+    radio50Div.classList.add('form-check', 'fs-5');
+
+    radio50Div.appendChild(radio50);
+    radio50Div.appendChild(radio50Label);
+
+    //agrega al DIV principal
+    divTipDiv.appendChild(heading);
+    divTipDiv.appendChild(radio10Div);
+    divTipDiv.appendChild(radio25Div);
+    divTipDiv.appendChild(radio50Div);
+    
+    //agregar al formulario
+    tipDiv.appendChild(divTipDiv);
+
+    contenido.appendChild(tipDiv);
+
+}
+
+function calculateTip(){
+    let subTotal = 0;
+    
+    order.orders.forEach(order => {
+        subTotal+=(order.price*order.quantity);
+    });
+
+    const tipSelected = document.querySelector('[name="tip"]:checked');
+    if(tipSelected){
+        const valueTipSelected = Number(tipSelected.value);
+        const tip = valueTipSelected*subTotal;
+        subTotal*=(1+valueTipSelected);
+        subTotal = Number(subTotal.toFixed(2));
+    
+    
+    const tipDiv = document.querySelector('#tipDiv');
+    let totalDiv; 
+    totalDiv = document.querySelector('#totalDiv');
+    if(!totalDiv){
+        totalDiv = document.createElement('DIV');
+        totalDiv.id = 'totalDiv';
+        totalDiv.classList.add('card', 'py-2', 'px-3', 'shadow', 'fs-4', 'fw-bold');
+        totalDiv.style.order=3;
+        tipDiv.appendChild(totalDiv);
+
+        if(!document.querySelector('#btnPay')){
+            const btnDiv = document.createElement('DIV');
+            btnDiv.classList.add('d-grid', 'gap-2');
+            const btnPay = document.createElement('BUTTON');
+            btnPay.id = 'btnPay';
+            btnPay.classList.add('btn', 'btn-primary', 'mt-4', 'btn-lg');
+            btnPay.textContent = 'Pay';
+            btnDiv.appendChild(btnPay)
+            tipDiv.appendChild(btnDiv);
+
+            const orderDetail = {
+                clientEmail : order.clientEmail,
+                orderHour : order.time,
+                table :  order.table,
+                orders : order.orders,
+                tip : tip,
+                paymentAmount : subTotal
+            }
+            btnPay.addEventListener('click', saveOrderOnDB);
+
+            function saveOrderOnDB(){
+                saveOrderAndPayment(orderDetail);
+            }
+        }
+    }
+    totalDiv.textContent = `Total to pay: $${subTotal}`;
+}
+    
+}
+
+function showHideTip(){
+    if(order.orders.length==1){
+        if(order.orders[0].quantity==1 && document.querySelector('#tipDiv').style.display!='block'){
+            document.querySelector('#tipDiv').style.display='block';
+        }
+    }else if(order.orders.length<1){
+            document.querySelector('#tipDiv').style.display='none';
     }
 }
 

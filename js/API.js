@@ -1,4 +1,4 @@
-const url = "http://localhost:4000";
+const url = "http://localhost:8080";
 
 export const saveBooking = async (clientBooking) => {
     try{
@@ -22,4 +22,8 @@ export const findAllDishes = async () => {
     }catch(error){
         console.log(`error loading dishes: ${error}`);
     }
+}
+
+export const saveOrderAndPayment = (orderDetail) => {
+    console.log('saving');
 }
