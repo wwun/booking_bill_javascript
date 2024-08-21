@@ -24,6 +24,16 @@ export const findAllDishes = async () => {
     }
 }
 
-export const saveOrderAndPayment = (orderDetail) => {
-    console.log('saving');
+export const saveOrderAndPayment = async (orderDetail) => {
+    try{
+        await fetch(`${url}/orderDetail`, {
+            method: 'POST',
+            body: JSON.stringify(orderDetail),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+    }catch(error){
+        console.log(`error: ${error}`);
+    }
 }
